@@ -21,3 +21,7 @@ One line per spec, hook and agent, added in the same change as the thing itself.
 - **Spec: rule-engine** (R3) · `.kiro/specs/rule-engine/` · requirements in EARS and a design with six correctness properties. Kiro writes the task list from them and runs it until the property tests pass. *Tasks not generated yet.*
 - **Hook: lab report on rules save** · `.kiro/hooks/lab-report-on-rules-save.json` · when Kiro saves a rule pack in `rules/`, runs the CLI and rewrites `reports/latest.md`. *Off until the CLI exists.*
 - **Hook: property tests after each task** · `.kiro/hooks/property-tests-after-task.json` · after every spec task, runs the property tests and tells the agent if one fails.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
