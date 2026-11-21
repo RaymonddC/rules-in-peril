@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Lab report on rules save",
+      "description": "When a rule pack in rules/ is saved, runs the rip CLI through `npm run report` and rewrites reports/latest.md. A command, not an agent prompt, so it costs no credits. Off until the crypt-and-cli spec adds the CLI and the report script; the last task of that spec sets enabled to true.",
+      "trigger": "PostFileSave",
+      "matcher": "(^|[\\\\/])rules[\\\\/][^\\\\/]+\\.json$",
+      "action": {
+        "type": "command",
+        "command": "npm run --silent report"
+      },
+      "timeout": 60,
+      "enabled": false
+    }
+  ]
+}

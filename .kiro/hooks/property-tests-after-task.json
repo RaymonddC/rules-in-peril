@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Property tests after each task",
+      "description": "After a spec task completes, runs every property test once (files named *.prop.test.ts). A command, not an agent prompt, so it costs no credits. Quiet when the tests pass; when one fails, the agent is told and fixes the code or the spec, never the property.",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "command",
+        "command": "npx vitest run .prop.test --passWithNoTests"
+      },
+      "timeout": 120,
+      "enabled": true
+    }
+  ]
+}
