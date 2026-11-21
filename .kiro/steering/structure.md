@@ -49,7 +49,11 @@ Code that both apps need goes in core. Code that one app needs stays in that app
 
 ## README
 
-`README.md` keeps a section "How Kiro was used": one line per spec, hook and agent, added in the same change as the thing itself.
+`README.md` keeps a section "How Kiro was used". Its headings follow the write-up questions in the Kiroween rules: Kiro IDE, CLI, Web, Crew; custom agents; agent hooks; spec-driven development; steering docs; MCP; property-based testing; Kiro powers.
+
+- Each spec, hook and agent gets one line under its heading, added in the same change as the thing itself.
+- When a property test catches a real bug, add one line under property-based testing: the property, what it caught, the fix.
+- Write only what happened. Do not credit Kiro with work done outside it.
 
 ## Working rules
 
