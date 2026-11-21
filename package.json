@@ -1,0 +1,19 @@
+{
+  "name": "rules-in-peril",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:igor": "npm run dev -w @rip/igor",
+    "dev:salt-circle": "npm run dev -w @rip/salt-circle",
+    "build:apps": "npm run build -w @rip/igor && npm run build -w @rip/salt-circle",
+    "build:site": "node build-site.mjs",
+    "preview:site": "vite preview --outDir dist --port 4173 --strictPort"
+  }
+}

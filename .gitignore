@@ -1,0 +1,4 @@
+node_modules/
+dist/
+*.log
+# /.kiro is committed. Never list it here.
