@@ -40,6 +40,16 @@ gcloud run deploy rules-in-peril --source . --project <project-id> --region <reg
 
 The project needs billing switched on. gcloud asks to enable the APIs it needs the first time, and prints the site's address when it finishes. Run the same command again to publish a new version.
 
+### Publish on every push to main
+
+`.github/workflows/deploy.yml` builds the image and deploys it each time `main` changes. It signs in to Google Cloud with a short-lived identity token from GitHub, so no key is stored anywhere. It reads four settings from the repository's Actions secrets. They are identifiers, not credentials, and are kept there so they stay out of the files and the public logs:
+
+- `GCP_PROJECT_ID` and `GCP_REGION`: where the service runs.
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: the Google Cloud identity provider that trusts this repository.
+- `GCP_DEPLOY_SA`: the service account the workflow deploys as.
+
+If any of the four is missing, the workflow publishes nothing and still passes.
+
 ## How Kiro was used
 
 The headings follow the write-up questions in the Kiroween rules. Each spec, hook and agent gets one line, added in the same change as the thing itself.
