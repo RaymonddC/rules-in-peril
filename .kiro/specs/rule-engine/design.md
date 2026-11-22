@@ -10,7 +10,11 @@ It does three things:
 2. `evaluate` and `runRules` give verdicts: the first matching rule wins, the default is approve, and every verdict names its rule.
 3. `signalsRead` lists the signals a rule set reads. The autopsy uses this later to find the signal no rule reads.
 
-This is the first spec in the repo, so its tasks also set up the npm workspace root, TypeScript in strict mode, Vitest, fast-check, Zod and the `@rip/core` package. Nothing else is set up here: no apps, no CLI, no rule packs.
+The npm workspace root, `tsconfig.base.json` and the two apps already exist. This spec's tasks add the `@rip/core` package to that workspace, with Vitest, fast-check and Zod, so that `npx vitest run` at the repo root runs the tests. They do not recreate or reformat the root files, and they do not touch `apps/`.
+
+The base tsconfig includes the DOM library, because the apps need it. The tsconfig for `packages/core` extends the base and sets `lib` to `["ES2022"]` and `types` to `[]`, so core does not compile if it touches the DOM or a Node built-in.
+
+Nothing else is set up here: no CLI, no rule packs.
 
 ## Architecture
 
