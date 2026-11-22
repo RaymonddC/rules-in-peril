@@ -11,13 +11,40 @@ Kiroween 2026, category Skeleton Crew. The plan of record is the deck in [docs/]
 
 All data is synthetic. Igor's people live in Vesper, a fictional country, and the signals are a generic model, not any vendor's data.
 
-**Status:** steering and the first spec's requirements and design. No tasks, no code. Nothing runs yet.
+**Status:** the screens for both apps run on hand-written sample data (seed 1818). The engine is not built yet: no spec has been run in Kiro, so no number on screen is a real result.
+
+## Run it
+
+Needs Node 22 or newer.
+
+```bash
+npm install
+npm run dev:igor          # Igor, with reload
+npm run dev:salt-circle   # Salt Circle, with reload
+```
+
+The whole site as it is hosted, with the front door at `/` and the apps at `/igor/` and `/salt-circle/`:
+
+```bash
+npm run build:site
+npm run preview:site      # http://localhost:4173
+```
+
+### Host it on Cloud Run
+
+The `Dockerfile` builds the site and serves the files with Caddy. The container runs no application code: the apps run in the visitor's browser. With the gcloud CLI signed in, from the repo root:
+
+```bash
+gcloud run deploy rules-in-peril --source . --project <project-id> --region <region> --allow-unauthenticated --max-instances 2
+```
+
+The project needs billing switched on. gcloud asks to enable the APIs it needs the first time, and prints the site's address when it finishes. Run the same command again to publish a new version.
 
 ## How Kiro was used
 
 The headings follow the write-up questions in the Kiroween rules. Each spec, hook and agent gets one line, added in the same change as the thing itself.
 
-The steering files, the rule-engine requirements and design, and the two hooks were drafted outside Kiro and committed for Kiro to work from. Kiro writes the task lists and the code. From world-generator on, Kiro writes the specs too.
+The steering files, the rule-engine requirements and design, and the two hooks were drafted outside Kiro and committed for Kiro to work from. The screens in `apps/`, the front door and the hosting files were also built outside Kiro. Kiro writes the task lists and the engine: `packages/core`, the two worlds and the CLI. From world-generator on, Kiro writes the specs too.
 
 ### Kiro IDE, CLI, Web, Crew
 
