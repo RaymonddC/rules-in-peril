@@ -1,0 +1,19 @@
+{
+  "name": "@rip/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": "./src/rules/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "fast-check": "^3.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.0"
+  }
+}

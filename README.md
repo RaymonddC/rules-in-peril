@@ -71,7 +71,7 @@ None yet. Doctor (invents monster patterns) and Inspector (proposes fixes) come 
 
 ### Spec-driven development
 
-- **rule-engine** (R3) · `.kiro/specs/rule-engine/` · requirements in EARS and a design with six correctness properties. Kiro writes the task list from them and runs it until the property tests pass. *Tasks not generated yet.*
+- **rule-engine** (R3) · `.kiro/specs/rule-engine/` · requirements in EARS and a design with six correctness properties. Kiro wrote the task list (14 tasks) and ran all of them: `packages/core` is built, all 20 example tests and all six property tests pass, and typecheck is clean.
 
 The prompt that starts each spec in Kiro is kept in [docs/kiro-prompts.md](docs/kiro-prompts.md), with the order the specs run in.
 

@@ -1,0 +1,243 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Add packages/core to the workspace": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361951392
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361957131
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795362549141
+      }
+    ],
+    "2. Define core types": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361951697
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795362552062
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363292933
+      }
+    ],
+    "3. Implement parseRules": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361951890
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363296068
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363480865
+      }
+    ],
+    "4. Implement evaluate, runRules, matches, and signalsRead": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361952102
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363298963
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363483654
+      }
+    ],
+    "5. Create public exports": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361952321
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363486477
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363773197
+      }
+    ],
+    "6. Create fast-check arbitraries": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361952557
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363489394
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363776167
+      }
+    ],
+    "7. Write example tests": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361952773
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363779013
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363846197
+      }
+    ],
+    "8. Property test 1 — First match wins": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361952962
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795363849390
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795364945648
+      }
+    ],
+    "9. Property test 2 — Conditions mean what they say": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361953203
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795364948688
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365010231
+      }
+    ],
+    "10. Property test 3 — A rule on top changes only what it matches": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361953421
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365013326
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365281017
+      }
+    ],
+    "11. Property test 4 — Label blind": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361953638
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365284397
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365383418
+      }
+    ],
+    "12. Property test 5 — Same input, same verdicts": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361953868
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365386940
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365562755
+      }
+    ],
+    "13. Property test 6 — Validation is total": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361954067
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365565983
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365675396
+      }
+    ],
+    "14. Final checkpoint — Ensure all tests and typecheck pass": [
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795361954252
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795365678567
+      },
+      {
+        "executionId": "4d992195-cfe0-4c7e-8356-4b5226cb5fde",
+        "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
+        "timestamp": 1795366013070
+      }
+    ]
+  }
+}
