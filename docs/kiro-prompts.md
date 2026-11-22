@@ -18,12 +18,20 @@ The three specs numbered 3 run in parallel, one person each. The prompts for fix
 
 After each spec: add its line to "How Kiro was used" in the README, in the same change.
 
+## What already exists
+
+The npm workspace root, `tsconfig.base.json` and the screens of both apps are in the repo. The screens run on hand-written sample data: each app has `src/lab/sample-run.ts`, which fills the view types in `src/lab/types.ts`.
+
+No spec rebuilds or restyles a screen. The specs build the engine and the two worlds. The last step for each app is an adapter that fills the view types from the engine's output and replaces `sample-run.ts`. The numbers on screen will then differ from the sample, and that is expected.
+
+`TODO(engine)` and `TODO(igor-world)` comments in `apps/` mark the places that wait for a spec.
+
 ## 1. rule-engine
 
 The requirements and design are already in `.kiro/specs/rule-engine/`. This prompt asks Kiro for the task list only. Use it in the chat for that spec.
 
 ```
-#spec:rule-engine The requirements and design for this spec are written and reviewed. Do not rewrite them. Generate tasks.md from them. Keep it short: workspace setup, types, parseRules, evaluate and runRules, signalsRead, then the tests. Make all six property tests required tasks, not optional. Stop after writing tasks.md so I can review it.
+#spec:rule-engine The requirements and design for this spec are written and reviewed. Do not rewrite them. Generate tasks.md from them. Keep it short: add packages/core to the workspace, types, parseRules, evaluate and runRules, signalsRead, then the tests. The npm workspace root already exists: add to it, do not recreate it, and do not touch apps/. The tsconfig for packages/core must not include the DOM library. Make all six property tests required tasks, not optional. Stop after writing tasks.md so I can review it.
 ```
 
 Then run all tasks. The spec is done when `npx vitest run` passes with the six property tests.
@@ -99,6 +107,8 @@ Requirements to cover:
 
 Last task, to run once shrink-and-autopsy is merged: the seed 1818 monster shrinks to two stitches (a child's ID number, a made-up name), each cut stops it walking, and the autopsy names registry.
 
+apps/igor/src/lab/example-rules.ts holds a hand-written copy of the starter pack for the screens. Once rules/starter-fintech.json exists it is the one source: resolve the TODO(igor-world) in that file and change nothing else under apps/igor/src.
+
 Make every property test a required task. Out of scope: screens, shrinking itself, pricing, the crypt, the CLI.
 
 Stop after requirements, design and tasks for my review. Ask one question at a time.
@@ -107,7 +117,7 @@ Stop after requirements, design and tasks for my review. Ask one question at a t
 ## 3. salt-circle
 
 ```
-Create the spec salt-circle. It serves R7 in product.md and lives in apps/salt-circle. Build the world first, in world/, then the two screens in src/.
+Create the spec salt-circle. It serves R7 in product.md and lives in apps/salt-circle. Build the world in world/. The two screens (The circle, Breach replay) already exist in src/ and run on sample data: do not rebuild or restyle them.
 
 World: a member is an agent task made of several actions. Each action is one record, checked on its own. Signals include the action's own fields (such as type and amount) and a running total for the task. A monster's stitches are its actions, and removing one rebuilds the running totals. Use the same rule format and the same three outcomes as the rule engine; screen words may differ (allowed, ask a human, blocked).
 
@@ -120,7 +130,7 @@ Requirements to cover:
 - Same seed gives the same world. Every record fits the schema. The truth label is never a signal.
 - synthetic-only.md applies: invented customers and orders, no real company or agent product names.
 
-Screens, once shrink-and-autopsy is merged: The circle (guardrails drawn as a ring) and Breach replay (the smallest breach, step by step). Dark theme. No network requests. Acceptance: the breach shrinks to four $499 refunds and the autopsy names the running total.
+Last task, once shrink-and-autopsy is merged: replace src/lab/sample-run.ts with an adapter that fills the view types in src/lab/types.ts from the engine's output, and delete the sample. Change a view type only where the engine cannot fill it. No network requests. Acceptance: on screen, the breach shrinks to four $499 refunds and the autopsy names the running total.
 
 Make every property test a required task. Out of scope: Igor, pricing, the crypt, the CLI.
 
