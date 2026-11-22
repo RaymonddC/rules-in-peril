@@ -1,0 +1,80 @@
+# Publishes the site to Cloud Run on every push to main.
+#
+# It builds the Dockerfile, pushes the image and deploys it to the service.
+#
+# Sign-in is keyless: GitHub hands the job a short-lived identity token and
+# Google Cloud accepts it (Workload Identity Federation). No key is stored.
+#
+# The four settings below are identifiers, not credentials. They are kept as
+# Actions secrets only so that they stay out of the files and the public logs.
+# If any is missing, the workflow publishes nothing and still passes.
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # lets the job ask GitHub for the identity token
+
+# One deploy at a time. A newer push waits for the one in flight.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  settings:
+    name: Check the deploy settings
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ secrets.GCP_REGION }}
+          PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          DEPLOY_SA: ${{ secrets.GCP_DEPLOY_SA }}
+        run: |
+          if [ -n "$PROJECT_ID" ] && [ -n "$REGION" ] && [ -n "$PROVIDER" ] && [ -n "$DEPLOY_SA" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The deploy settings are not set on this repository. Nothing was published."
+          fi
+
+  deploy:
+    name: Build and deploy
+    needs: settings
+    if: needs.settings.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}
+      SERVICE: rules-in-peril
+      REGISTRY_REPO: cloud-run-source-deploy
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sign in to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Build and push the image
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REGISTRY_REPO}/${SERVICE}:${GITHUB_SHA}"
+          docker build --provenance=false -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      # The service keeps its own settings (public access, instance limit).
+      # This only swaps the image.
+      - name: Deploy to Cloud Run
+        run: gcloud run deploy "$SERVICE" --image "$IMAGE" --project "$PROJECT_ID" --region "$REGION" --quiet

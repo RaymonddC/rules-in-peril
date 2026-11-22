@@ -8,6 +8,7 @@ One template, two distinct apps, each in its own folder. Do not add top-level fo
 
 ```
 .kiro/               Kiro steering, specs, hooks and agents. Committed. Never in .gitignore.
+.github/workflows/   GitHub Actions: CI, and deploy.yml, which publishes the site.
 docs/                The deck (plan of record) and kiro-prompts.md, the prompt that starts each spec.
 packages/core/       The skeleton. Rule engine, world interface, shrinking, autopsy, fix pricing, crypt format.
 packages/cli/        The rip CLI. Runs a world against a rules file, writes the report, re-runs the crypt.

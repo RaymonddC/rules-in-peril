@@ -13,7 +13,7 @@ inclusion: always
 - Vitest for tests.
 - npm workspaces. Node 22 or newer.
 - GitHub Actions for CI.
-- The site is hosted on Cloud Run. The `Dockerfile` at the root builds the static site (`npm run build:site`) and serves the files with Caddy.
+- The site is hosted on Cloud Run. The `Dockerfile` at the root builds the static site (`npm run build:site`) and serves the files with Caddy. `.github/workflows/deploy.yml` publishes it on every push to `main`.
 
 Do not add a dependency unless a spec task needs it. Ask first.
 
@@ -21,7 +21,7 @@ Do not add a dependency unless a spec task needs it. Ask first.
 
 - Static site and CLI only. No server, no backend, no accounts, no database. The hosting container only hands out the built files and runs no application code. Do not add routes, handlers or server-side logic to it.
 - No LLM or ML model at run time. Kiro agents work at build time, and what they produce is committed as plain code or JSON.
-- No API keys, tokens, secrets or `.env` files. There is nothing to configure.
+- No API keys, tokens, secrets or `.env` files. There is nothing to configure. The one exception is the deploy workflow: it signs in without a stored key and reads the hosting project's identifiers from the repository's settings. Those are not credentials, and no app or CLI code reads them.
 - The apps make no network request after the page loads: no fetch, no analytics, no remote fonts or scripts. A rules file the user loads is read in the browser and never leaves it (R1).
 - `/.kiro` is committed and never listed in `.gitignore`.
 
