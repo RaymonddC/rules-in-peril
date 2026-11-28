@@ -21,7 +21,11 @@ const conditionSchema = z
   .object({
     signal: z.string(),
     op: opSchema,
-    value: z.union([z.number(), z.boolean(), z.string()]),
+    value: z.union([
+      z.number().refine(Number.isFinite, { message: "'value' must be a finite number" }),
+      z.boolean(),
+      z.string(),
+    ]),
   })
   .strict();
 
@@ -47,6 +51,165 @@ const rulesInputSchema = z
     rules: z.array(z.unknown()),
   })
   .strict();
+
+// ---------------------------------------------------------------------------
+// Plain-words message mapping — never passes Zod library text to callers
+// ---------------------------------------------------------------------------
+
+type ZodIssue = z.ZodIssue;
+
+/**
+ * Return the best-matching inner issues from an `invalid_union` issue.
+ * "Best" means the branch whose issues have the deepest path (most specific).
+ */
+function flattenUnionIssues(issue: ZodIssue): ZodIssue[] {
+  if (issue.code !== "invalid_union") return [issue];
+  const branches = (issue as z.core.$ZodIssueInvalidUnion).errors ?? [];
+  if (branches.length === 0) return [issue];
+  let best: ZodIssue[] = branches[0] ?? [issue];
+  for (const branch of branches) {
+    const bestDepth = Math.max(0, ...best.map((i) => i.path.length));
+    const branchDepth = Math.max(0, ...branch.map((i) => i.path.length));
+    if (branchDepth > bestDepth) best = branch;
+  }
+  return best.length > 0 ? best : [issue];
+}
+
+/** Safe helper: extract a string key from a path segment. */
+function pathKey(seg: string | number | symbol): string {
+  return String(seg);
+}
+
+/**
+ * Translate one Zod issue into a plain-words message that names the
+ * offending key. All five cases from Requirement 1.7 are covered.
+ */
+function zodIssueToMessage(issue: ZodIssue, contextPath: (string | number)[] = []): string {
+  const fullPath: (string | number)[] = [
+    ...contextPath,
+    ...issue.path.map(pathKey),
+  ];
+  const keyName = fullPath.length > 0 ? String(fullPath[fullPath.length - 1]) : null;
+
+  switch (issue.code) {
+    case "unrecognized_keys": {
+      const keys = (issue as z.core.$ZodIssueUnrecognizedKeys).keys ?? [];
+      const keyStrings = keys.map(pathKey);
+      if (keyStrings.length === 1) {
+        return `unknown key "${keyStrings[0]}" is not allowed`;
+      }
+      return `unknown keys ${keyStrings.map((k) => `"${k}"`).join(", ")} are not allowed`;
+    }
+
+    case "invalid_value": {
+      const values = (issue as z.core.$ZodIssueInvalidValue).values ?? [];
+      const strValues = values.map(String);
+      if (
+        keyName === "then" ||
+        (strValues.includes("reject") && strValues.includes("review") && strValues.includes("approve"))
+      ) {
+        return `'then' is missing or invalid: expected reject, review or approve`;
+      }
+      if (
+        keyName === "op" ||
+        strValues.every((v) => ["=", "!=", "<", "<=", ">", ">="].includes(v))
+      ) {
+        return `'op' is not valid: expected =, !=, <, <=, > or >=`;
+      }
+      return `'${keyName ?? "value"}' is not valid: expected one of ${strValues.map((v) => JSON.stringify(v)).join(", ")}`;
+    }
+
+    case "invalid_type": {
+      // Zod 4 does not expose the received value directly on the issue;
+      // extract it from the standard "Invalid input: expected X, received Y" message.
+      const receivedMatch = issue.message.match(/received (\w+)$/);
+      const receivedType = receivedMatch ? receivedMatch[1] : "unknown";
+      if (keyName === "when") {
+        return `'when' must be a condition object { signal, op, value } or { all: [...] }, got ${receivedType}`;
+      }
+      if (keyName === "value") {
+        return `'value' is missing: expected a number, boolean or string`;
+      }
+      if (keyName === "rules") {
+        return `'rules' must be an array`;
+      }
+      if (keyName === null) {
+        const expected = (issue as z.core.$ZodIssueInvalidType).expected;
+        return `expected ${String(expected)}, got ${receivedType}`;
+      }
+      return `'${keyName}' is missing or has the wrong type`;
+    }
+
+    case "invalid_union": {
+      const inner = flattenUnionIssues(issue);
+      const allExpectObject = inner.every(
+        (i) => i.code === "invalid_type" && i.path.length === 0,
+      );
+      if (keyName === "when" && allExpectObject) {
+        const firstInner = inner[0];
+        if (firstInner) {
+          const receivedMatch = firstInner.message.match(/received (\w+)$/);
+          const receivedType = receivedMatch ? receivedMatch[1] : "unknown";
+          return `'when' must be a condition object { signal, op, value } or { all: [...] }, got ${receivedType}`;
+        }
+      }
+      // contextForInner: the path segments we know about minus the issue's own path
+      // so inner issues that have no path still know their parent key
+      const contextForInner = fullPath.slice(0, fullPath.length - issue.path.length);
+      for (const innerIssue of inner) {
+        // If the inner issue has no path, pass our current fullPath as its context
+        // so it knows the key it belongs to
+        const innerContext = innerIssue.path.length === 0 ? fullPath : contextForInner;
+        const msg = zodIssueToMessage(innerIssue, innerContext);
+        // Accept any message that is not a raw Zod pass-through
+        if (!msg.startsWith("'input' is invalid")) return msg;
+      }
+      const firstIssue = inner[0];
+      if (firstIssue) {
+        const innerContext = firstIssue.path.length === 0 ? fullPath : contextForInner;
+        return zodIssueToMessage(firstIssue, innerContext);
+      }
+      return `'${keyName ?? "input"}' is invalid`;
+    }
+
+    case "too_small": {
+      if (keyName === "all") {
+        return `'all' must contain at least one condition`;
+      }
+      return `'${keyName ?? "value"}' is too small`;
+    }
+
+    case "custom": {
+      const pathSeg = fullPath.length > 0 ? String(fullPath[fullPath.length - 1]) : "value";
+      const rawMsg = issue.message ?? "";
+      if (rawMsg.includes("finite")) {
+        return `'value' must be a finite number (Infinity and -Infinity are not allowed)`;
+      }
+      return `'${pathSeg}': ${rawMsg}`;
+    }
+
+    default: {
+      const pathSeg = fullPath.length > 0 ? String(fullPath[fullPath.length - 1]) : "input";
+      return `'${pathSeg}' is invalid`;
+    }
+  }
+}
+
+/**
+ * Translate a list of Zod issues to `RuleError` objects, mapping every
+ * issue through `zodIssueToMessage` so no Zod library text reaches callers.
+ */
+function zodIssuesToRuleErrors(
+  issues: ZodIssue[],
+  ruleIndex: number | null,
+  ruleId: string | null,
+): RuleError[] {
+  return issues.map((issue) => ({
+    ruleIndex,
+    ruleId,
+    message: zodIssueToMessage(issue),
+  }));
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,7 +241,7 @@ function checkConditionSemantics(
   ruleId: string | null,
   errors: RuleError[],
 ): void {
-  const sigType = schema[cond.signal];
+  const sigType = Object.hasOwn(schema, cond.signal) ? schema[cond.signal] : undefined;
 
   // 1.4 — unknown signal
   if (sigType === undefined) {
@@ -140,18 +303,13 @@ function checkConditionSemantics(
 // ---------------------------------------------------------------------------
 
 export function parseRules(input: unknown, schema: SignalSchema): ParseResult {
+  try {
   const errors: RuleError[] = [];
 
   // ---- Top-level structure ------------------------------------------------
   const topResult = rulesInputSchema.safeParse(input);
   if (!topResult.success) {
-    // Map Zod issues to RuleErrors with no ruleIndex
-    const topErrors: RuleError[] = topResult.error.issues.map((issue) => ({
-      ruleIndex: null,
-      ruleId: null,
-      message: issue.message,
-    }));
-    return { ok: false, errors: topErrors };
+    return { ok: false, errors: zodIssuesToRuleErrors(topResult.error.issues, null, null) };
   }
 
   const rawRules: unknown[] = topResult.data.rules;
@@ -166,13 +324,7 @@ export function parseRules(input: unknown, schema: SignalSchema): ParseResult {
     const ruleResult = ruleSchema.safeParse(rawRule);
 
     if (!ruleResult.success) {
-      for (const issue of ruleResult.error.issues) {
-        errors.push({
-          ruleIndex: i,
-          ruleId,
-          message: issue.message,
-        });
-      }
+      errors.push(...zodIssuesToRuleErrors(ruleResult.error.issues, i, ruleId));
     } else {
       // Cast through unknown to satisfy TypeScript — Zod's inferred type
       // matches our Rule interface structurally but isn't directly assignable
@@ -223,4 +375,7 @@ export function parseRules(input: unknown, schema: SignalSchema): ParseResult {
     rules: validRules.map(({ rule }) => rule),
   };
   return { ok: true, ruleSet };
+  } catch {
+    return { ok: false, errors: [{ ruleIndex: null, ruleId: null, message: "unexpected error during validation" }] };
+  }
 }

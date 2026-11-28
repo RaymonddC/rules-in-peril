@@ -21,9 +21,58 @@ describe("Property 6: Validation is total", () => {
     "6.1 — parseRules never throws for any JavaScript value",
     { timeout: 30_000 },
     () => {
+      // Input A: fc.anything() — the original broad fuzz
       fc.assert(
         fc.property(
           fc.tuple(fc.anything(), arbSignalSchema()),
+          ([input, schema]) => {
+            let result: ParseResult | undefined;
+            expect(() => {
+              result = parseRules(input, schema);
+            }).not.toThrow();
+            if (result !== undefined && !result.ok) {
+              expect(result.errors.length).toBeGreaterThan(0);
+            }
+          },
+        ),
+        { numRuns: 200 },
+      );
+
+      // Input B: an object with a rules array of arbitrary values
+      fc.assert(
+        fc.property(
+          fc.tuple(
+            fc.record({ rules: fc.array(fc.anything()) }),
+            arbSignalSchema(),
+          ),
+          ([input, schema]) => {
+            let result: ParseResult | undefined;
+            expect(() => {
+              result = parseRules(input, schema);
+            }).not.toThrow();
+            if (result !== undefined && !result.ok) {
+              expect(result.errors.length).toBeGreaterThan(0);
+            }
+          },
+        ),
+        { numRuns: 200 },
+      );
+
+      // Input C: a rule-shaped object where id, when, and then are arbitrary
+      fc.assert(
+        fc.property(
+          fc.tuple(
+            fc.record({
+              rules: fc.array(
+                fc.record({
+                  id: fc.anything(),
+                  when: fc.anything(),
+                  then: fc.anything(),
+                }),
+              ),
+            }),
+            arbSignalSchema(),
+          ),
           ([input, schema]) => {
             let result: ParseResult | undefined;
             expect(() => {
@@ -77,6 +126,10 @@ describe("Property 6: Validation is total", () => {
   //
   // For any valid rules input that has at least one rule: replace the first
   // rule's condition signal name with a signal that is not in the schema.
+  // Draws the bad signal name from two sources with equal probability:
+  //   - an inherited prototype name (constructor, toString, etc.)
+  //   - a random string that is not a key in the schema
+  // Varies the placement of the bad condition between direct and all-wrapped.
   // parseRules must return a failure, and at least one error must carry
   // ruleIndex 0.
   //
@@ -92,13 +145,36 @@ describe("Property 6: Validation is total", () => {
           arbSignalSchema().chain((schema) =>
             arbRuleSet(schema)
               .filter((rs) => rs.rules.length > 0)
-              .map((rs) => ({ schema, ruleSet: rs })),
+              .chain((ruleSet) =>
+                fc.tuple(
+                  fc.constant(schema),
+                  fc.constant(ruleSet),
+                  // bad signal name: inherited prototype name OR unknown random string
+                  fc.oneof(
+                    fc.constantFrom(
+                      "constructor",
+                      "toString",
+                      "__proto__",
+                      "hasOwnProperty",
+                    ),
+                    fc.string().filter((s) => !Object.hasOwn(schema, s)),
+                  ),
+                  // placement: direct condition or inside an all list
+                  fc.oneof(
+                    fc.constant("direct" as const),
+                    fc.constant("all" as const),
+                  ),
+                ),
+              ),
           ),
-          ({ schema, ruleSet }) => {
-            const badSignal = "UNKNOWN_SIGNAL_XYZ";
+          ([schema, ruleSet, badSignal, placement]) => {
             const firstRule = ruleSet.rules[0]!;
             const badCondition = { signal: badSignal, op: "=" as const, value: 0 };
-            const badRule = { ...firstRule, when: badCondition };
+            const badWhen =
+              placement === "direct"
+                ? badCondition
+                : { all: [badCondition] };
+            const badRule = { ...firstRule, when: badWhen };
             const badRuleSet = { rules: [badRule, ...ruleSet.rules.slice(1)] };
 
             const result = parseRules(badRuleSet, schema);

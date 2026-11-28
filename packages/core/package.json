@@ -9,7 +9,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "zod": "^3.0.0"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "fast-check": "^3.0.0",

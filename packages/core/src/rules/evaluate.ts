@@ -12,7 +12,7 @@ function getConditions(when: When): readonly Condition[] {
 
 /** Evaluate one Condition against the signals map. Throws if the signal is absent. */
 function evalCondition(cond: Condition, signals: Signals): boolean {
-  if (!(cond.signal in signals)) {
+  if (!Object.hasOwn(signals, cond.signal)) {
     throw new Error(`missing signal: "${cond.signal}"`);
   }
   const sv = signals[cond.signal];

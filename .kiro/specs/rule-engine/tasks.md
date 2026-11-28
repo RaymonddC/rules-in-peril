@@ -104,6 +104,50 @@ Add `packages/core` to the existing npm workspace and implement the rule engine:
   - If any property test caught a real bug during the run, add one sentence under a "Property-based testing" subsection in `README.md` describing what it found
   - Ask the user if any questions arise before closing the spec
 
+- [x] 15. Guard against inherited property names in signal lookup
+  - In `packages/core/src/rules/parse.ts`, replace `schema[cond.signal]` with `Object.hasOwn(schema, cond.signal) ? schema[cond.signal] : undefined` in `checkConditionSemantics`, so that `"constructor"`, `"toString"`, `"__proto__"` and `"hasOwnProperty"` are not found as signals when the schema has no such key.
+  - In `packages/core/src/rules/evaluate.ts`, replace `cond.signal in signals` with `Object.hasOwn(signals, cond.signal)` in `evalCondition`.
+  - Add example tests in `rules.test.ts`: for each of the four names (`"constructor"`, `"toString"`, `"__proto__"`, `"hasOwnProperty"`), a rule that uses it as a signal is rejected at load with an error message that contains that name.
+  - _Requirements: 1.4, 2.5_
+
+- [x] 16. Upgrade Zod to ^4.6.6 and enforce finite numbers
+  - In `packages/core/package.json`, change the zod dependency to `"zod": "^4.6.6"`.
+  - Read the Zod 4 migration guide before editing `parse.ts`. Key changes: `.strict()` chaining on objects, `z.enum` takes an array literal, error issue shapes differ.
+  - Update `packages/core/src/rules/parse.ts` for any Zod 4 API differences.
+  - Enforce finite numbers: add a check so that `Infinity` and `-Infinity` are rejected as condition values.
+  - Run `npm install` from the repo root to update `package-lock.json`.
+  - Add an example test: `Infinity` as a condition value is rejected by `parseRules`.
+  - After this task, `npm audit` must report 0 vulnerabilities.
+  - _Requirements: 1.2, 1.3, 1.5_
+
+- [x] 17. Write plain-words error messages for every load error
+  - In `packages/core/src/rules/parse.ts`, replace every Zod-generated message passed through (e.g. `"Required"`, `"Invalid input"`) with handwritten messages that name the key and say what was expected.
+  - Required cases: missing `then`; bad `op` value; condition with no `value`; `when` that is not an object (e.g. a plain string); unknown key in an object.
+  - Do not pass any Zod library message text through to callers.
+  - Add example tests for each of the five cases: missing `then`, bad `op`, missing `value`, `when` that is a string, unknown key; each test checks that the error message names the offending key.
+  - _Requirements: 1.7_
+
+- [x] 18. Make parseRules safe against property-getter throws
+  - In `packages/core/src/rules/parse.ts`, wrap the entire body of `parseRules` in a `try/catch`. If the catch fires, return `{ ok: false, errors: [{ ruleIndex: null, ruleId: null, message: "unexpected error during validation" }] }`.
+  - Add an example test: an input object whose property getter throws does not make `parseRules` throw; it returns `{ ok: false }`.
+  - _Requirement: 1.1_
+
+- [x] 19. Rewrite the first test in Property 4 to test label blindness properly
+  - In `packages/core/src/rules/prop4-label-blind.prop.test.ts`, rewrite the first `fc.assert` block so it draws a schema, a valid rule set, and a signals object; builds two members with different ids and different extra fields (one with label `"villager"`, one with label `"monster"`), whose signals are equal but are separate objects; calls `runRules` once with both members; and asserts that both verdicts are equal.
+  - Leave the second `fc.assert` block (the one about signals not in `signalsRead`) exactly as it is.
+  - _Requirements: 4.1, 4.2_
+
+- [x] 20. Improve Property 6 coverage and run final checkpoint
+  - In `packages/core/src/rules/prop6-parse-total.prop.test.ts`, extend the never-throws test to also try `{ rules: fc.array(fc.anything()) }` and rule-shaped objects where each of `id`, `when` and `then` is `fc.anything()`.
+  - In the unknown-signal test, draw the bad signal name from either one of the four inherited names from task 15 or a random string not in the schema; also vary placement between a direct `when` condition and one nested inside `{ all: [...] }`.
+  - Delete `packages/core/tsconfig.test.json` if it exists.
+  - Run `npx vitest run` from the repo root; all tests must pass.
+  - Run `npm run typecheck -w @rip/core` and confirm no errors.
+  - Run `npm audit` and confirm 0 vulnerabilities.
+  - Run `git status` and confirm changed paths are only under `packages/core/`, `package-lock.json`, this spec's `tasks.md` and `tasks.meta.json`, and `README.md`.
+  - Update the rule-engine line in `README.md` if test counts changed. If a property test caught a real bug during this round, add one sentence under `"Property-based testing"` in `README.md`.
+  - _Requirements: 1.1, 1.4_
+
 ## Notes
 
 - Tasks 8–13 are property tests driven by fast-check and are **required** (no `*` mark). `npx vitest run` must pass all six before the spec is considered done.
@@ -127,7 +171,13 @@ Add `packages/core` to the existing npm workspace and implement the rule engine:
     { "id": 8, "tasks": ["11"] },
     { "id": 9, "tasks": ["12"] },
     { "id": 10, "tasks": ["13"] },
-    { "id": 11, "tasks": ["14"] }
+    { "id": 11, "tasks": ["14"] },
+    { "id": 12, "tasks": ["15"] },
+    { "id": 13, "tasks": ["16"] },
+    { "id": 14, "tasks": ["17"] },
+    { "id": 15, "tasks": ["18"] },
+    { "id": 16, "tasks": ["19"] },
+    { "id": 17, "tasks": ["20"] }
   ]
 }
 ```

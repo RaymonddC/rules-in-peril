@@ -238,6 +238,83 @@
         "chatSessionId": "sess_e52fd5bb-4366-4ed9-b892-209151ff8e44",
         "timestamp": 1795366013070
       }
+    ],
+    "15. Guard against inherited property names in signal lookup": [
+      {
+        "executionId": "129323d2-1176-46bc-96ae-ca61736eba46",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795862891700
+      },
+      {
+        "executionId": "129323d2-1176-46bc-96ae-ca61736eba46",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795862980235
+      }
+    ],
+    "16. Upgrade Zod to ^4.6.6 and enforce finite numbers": [
+      {
+        "executionId": "129323d2-1176-46bc-96ae-ca61736eba46",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795862993627
+      },
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795863381516
+      },
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795864030713
+      }
+    ],
+    "17. Write plain-words error messages for every load error": [
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795864041496
+      },
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795865952400
+      }
+    ],
+    "18. Make parseRules safe against property-getter throws": [
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795865963283
+      },
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795866144289
+      }
+    ],
+    "19. Rewrite the first test in Property 4 to test label blindness properly": [
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795866155103
+      },
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795866350519
+      }
+    ],
+    "20. Improve Property 6 coverage and run final checkpoint": [
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795866361467
+      },
+      {
+        "executionId": "02783567-f7d4-4662-b932-18db129496eb",
+        "chatSessionId": "sess_6c8c73b1-4b3e-4c65-abab-9f58e2492da3",
+        "timestamp": 1795866814961
+      }
     ]
   }
 }

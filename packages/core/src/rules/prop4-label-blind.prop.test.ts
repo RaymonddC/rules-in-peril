@@ -3,7 +3,7 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { arbRuleSet, arbSignalSchema, arbSignals } from "./arbitraries.js";
-import { evaluate, signalsRead } from "./evaluate.js";
+import { evaluate, runRules, signalsRead } from "./evaluate.js";
 import type { SignalSchema, SignalType } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -28,11 +28,25 @@ describe("Property 4: Label blind", () => {
             fc.tuple(arbRuleSet(schema), arbSignals(schema)),
           ),
           ([ruleSet, signals]) => {
-            // evaluate only takes (ruleSet, signals); member id never reaches it.
-            // Calling twice with identical signals must give identical verdicts.
-            const v1 = evaluate(ruleSet, signals);
-            const v2 = evaluate(ruleSet, signals);
-            expect(v1).toEqual(v2);
+            // Build two members with different ids, different extra fields
+            // (one labelled "villager", one "monster"), and signals that are
+            // equal values but separate objects (not the same reference).
+            const memberA = {
+              id: "member-a",
+              label: "villager" as const,
+              signals: { ...signals },   // copy — separate object, same values
+            };
+            const memberB = {
+              id: "member-b",
+              label: "monster" as const,
+              signals: { ...signals },   // copy — separate object, same values
+            };
+
+            // runRules only reads .id and .signals; label is an extra field it ignores.
+            const results = runRules(ruleSet, [memberA, memberB]);
+
+            expect(results).toHaveLength(2);
+            expect(results[0]!.verdict).toEqual(results[1]!.verdict);
           },
         ),
         { numRuns: 200 },

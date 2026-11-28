@@ -233,6 +233,14 @@ describe("load errors", () => {
     );
     expect(result.ok).toBe(false);
   });
+
+  it("rejects Infinity as a condition value", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "score", op: ">", value: Infinity }, then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -292,5 +300,115 @@ describe("missing signal at runtime", () => {
     }
     expect(threw).toBe(true);
     expect(results).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rejects inherited property names as signals
+// ---------------------------------------------------------------------------
+
+describe("rejects inherited property names as signals", () => {
+  const emptySchema: SignalSchema = {};
+
+  for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty"] as const) {
+    it(`rejects "${name}" as a signal name`, () => {
+      const result = parseRules(
+        { rules: [{ id: `r-${name}`, when: { signal: name, op: "=", value: 0 }, then: "reject" }] },
+        emptySchema,
+      );
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.errors.some((e) => e.message.includes(name))).toBe(true);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Property-getter throws do not propagate (Req 1.1)
+// ---------------------------------------------------------------------------
+
+describe("parseRules never throws", () => {
+  it("returns ok:false when an input property getter throws", () => {
+    const evil = Object.defineProperty({}, "rules", {
+      get() { throw new Error("boom"); },
+      enumerable: true,
+    });
+    let result: ReturnType<typeof parseRules> | undefined;
+    expect(() => { result = parseRules(evil, {}); }).not.toThrow();
+    expect(result?.ok).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plain-words error messages (Req 1.7)
+// ---------------------------------------------------------------------------
+
+describe("plain-words error messages", () => {
+  it("missing 'then' — error names 'then'", () => {
+    // Rule has no 'then' field at all
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "score", op: "<", value: 10 } }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("then"))).toBe(true);
+  });
+
+  it("bad 'op' value — error names 'op'", () => {
+    const result = parseRules(
+      {
+        rules: [
+          { id: "r1", when: { signal: "score", op: "badop", value: 10 }, then: "reject" },
+        ],
+      },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("op"))).toBe(true);
+  });
+
+  it("missing 'value' in condition — error names 'value'", () => {
+    const result = parseRules(
+      {
+        rules: [
+          { id: "r1", when: { signal: "score", op: "<" }, then: "reject" },
+        ],
+      },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("value"))).toBe(true);
+  });
+
+  it("'when' is a plain string — error names 'when'", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: "bad", then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("when"))).toBe(true);
+  });
+
+  it("unknown key in rule — error names the unknown key", () => {
+    const result = parseRules(
+      {
+        rules: [
+          {
+            id: "r1",
+            when: { signal: "score", op: "<", value: 10 },
+            then: "reject",
+            extra: true,
+          },
+        ],
+      },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("extra"))).toBe(true);
   });
 });
