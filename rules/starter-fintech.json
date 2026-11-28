@@ -1,0 +1,11 @@
+{
+  "rules": [
+    { "id": "low-doc-score", "when": { "signal": "docScore", "op": "<", "value": 40 }, "then": "reject" },
+    { "id": "under-18", "when": { "signal": "age", "op": "<", "value": 18 }, "then": "reject" },
+    { "id": "busy-device", "when": { "signal": "deviceIds24h", "op": ">=", "value": 3 }, "then": "reject" },
+    { "id": "datacenter-ip", "when": { "signal": "ipType", "op": "=", "value": "datacenter" }, "then": "review" },
+    { "id": "maildrop-new-file", "when": { "all": [{ "signal": "addressType", "op": "=", "value": "maildrop" }, { "signal": "fileAgeMonths", "op": "=", "value": 0 }] }, "then": "reject" },
+    { "id": "new-phone-and-email", "when": { "all": [{ "signal": "phoneAgeDays", "op": "<", "value": 3 }, { "signal": "emailAgeDays", "op": "<", "value": 3 }] }, "then": "review" },
+    { "id": "fast-form", "when": { "signal": "fillSeconds", "op": "<", "value": 20 }, "then": "reject" }
+  ]
+}
