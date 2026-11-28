@@ -1,6 +1,10 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { parseRules, runWorld } from "@rip/core";
+import { makeIgorWorld } from "../../world/index";
+import { IGOR_SCHEMA } from "../../world/schema";
 import { draftsProblem, starterDrafts, toRuleViews, type DraftRule } from "./rule-builder";
 import { rulePacks, sampleRun, SAMPLE_SEED, starterFintech } from "./sample-run";
+import { engineRunToLabRun } from "./adapter";
 import type { Fix, LabRun, RulePack, RuleView } from "./types";
 
 interface UploadedRules {
@@ -40,6 +44,42 @@ interface LabState {
 }
 
 const Ctx = createContext<LabState | null>(null);
+
+// ---------------------------------------------------------------------------
+// parseConditionCode
+// ---------------------------------------------------------------------------
+// Converts a human code string like "docScore < 40 and age > 18" back into
+// a When clause for the rule engine. Used when rules come from RuleView (pack
+// or file) and need to be validated by parseRules before running.
+//
+// Supported formats (from the rule-builder and load-rules):
+//   "signal op value"
+//   "signal op value and signal op value [...]"
+
+type ParsedWhen =
+  | { signal: string; op: string; value: string | number | boolean }
+  | { all: { signal: string; op: string; value: string | number | boolean }[] };
+
+function parseOneCondition(text: string): { signal: string; op: string; value: string | number | boolean } | null {
+  const match = /^(\w+)\s*(=|!=|<=|>=|<|>)\s*(.+)$/.exec(text.trim());
+  if (!match) return null;
+  const [, signal, op, rawValue] = match as unknown as [string, string, string, string];
+  let value: string | number | boolean = rawValue.trim();
+  if (value === "true") value = true;
+  else if (value === "false") value = false;
+  else if (!isNaN(Number(value))) value = Number(value);
+  return { signal, op, value };
+}
+
+function parseConditionCode(code: string): ParsedWhen {
+  const parts = code.split(/\s+and\s+/i);
+  if (parts.length === 1) {
+    return parseOneCondition(parts[0]!) ?? { signal: "__invalid__", op: "=", value: 0 };
+  }
+  const all = parts.map((p) => parseOneCondition(p) ?? { signal: "__invalid__", op: "=", value: 0 });
+  return { all };
+}
+
 
 export function LabProvider({ children }: { children: ReactNode }) {
   const [seed, setSeed] = useState(String(SAMPLE_SEED));
@@ -82,10 +122,33 @@ export function LabProvider({ children }: { children: ReactNode }) {
       activeRules,
       notReady,
       run,
-      // TODO(engine): run the world for this seed and these rules in core.
-      // Until then every run is the seed 1818 sample.
+      // Run the world for this seed and these rules.
+      // Falls back to the seed 1818 sample when parsing fails.
       raise: () => {
-        setRun(sampleRun);
+        const numericSeed = Number(seed);
+        const rulesJson = { rules: activeRules.rules.map((rv) => ({
+          id: rv.id,
+          when: parseConditionCode(rv.code),
+          then: rv.then,
+        })) };
+        const parseResult = parseRules(rulesJson, IGOR_SCHEMA);
+        if (!parseResult.ok) {
+          // Fallback to sample if the rules can't be parsed (e.g. from builder)
+          setRun(sampleRun);
+        } else {
+          const ruleSet = parseResult.ruleSet;
+          const world = makeIgorWorld(numericSeed, 880, 120);
+          const report = runWorld(world, ruleSet, numericSeed);
+          const labRun = engineRunToLabRun(
+            world,
+            report,
+            ruleSet,
+            activeRules.rules,
+            numericSeed,
+            source === "pack" ? packId : "custom",
+          );
+          setRun(labRun);
+        }
         setRunAsked({ seed, custom: source !== "pack" });
         setBuried(false);
         setPlayAttack(true);

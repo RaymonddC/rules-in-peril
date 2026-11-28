@@ -1,0 +1,14 @@
+{
+  "name": "@rip/cli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@rip/core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
