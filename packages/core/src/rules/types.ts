@@ -1,6 +1,3 @@
-// Core rule-engine types.
-// These are the only types the rule engine knows. No Igor. No Salt Circle.
-
 export type SignalValue = number | boolean | string;
 export type Signals = Readonly<Record<string, SignalValue>>;
 
@@ -31,7 +28,7 @@ export interface RuleSet {
   rules: readonly Rule[];
 }
 
-/** ruleId is null when the verdict is the default approve. */
+/** ruleId is null when the verdict is the default. */
 export interface Verdict {
   outcome: Outcome;
   ruleId: string | null;

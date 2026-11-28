@@ -93,7 +93,7 @@ export function runWorld<S>(world: World<S>, ruleSet: RuleSet, seed: number): Ru
 
     for (let ri = 0; ri < member.records.length; ri++) {
       const rec = member.records[ri]!;
-      const v = evaluate(ruleSet, rec, member.id);
+      const v = evaluate(ruleSet, rec);
       verdicts.push({
         memberId: member.id,
         recordIndex: ri,

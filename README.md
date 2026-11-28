@@ -11,7 +11,7 @@ Kiroween 2026, category Skeleton Crew. The plan of record is the deck in [docs/]
 
 All data is synthetic. Igor's people live in Vesper, a fictional country, and the signals are a generic model, not any vendor's data.
 
-**Status:** the engine (`packages/core`), both worlds and the CLI report run, with 105 passing tests. With seed 1818 and the starter pack, 46 of 120 monsters walk, every walker shrinks to 2 stitches, and 0.6% of villagers are rejected. Still to come: the crypt format and the CLI's exit 1 when a crypt monster walks, and a check that every screen shows engine output instead of the sample.
+**Status:** the engine (`packages/core`), both worlds and the CLI report run, with 107 passing tests. With seed 1818 and the starter pack, 46 of 120 monsters walk, every walker shrinks to 2 stitches, and 0.6% of villagers are rejected. Still to come: the crypt format and the CLI's exit 1 when a crypt monster walks, and a check that every screen shows engine output instead of the sample.
 
 **Technical depth:** [docs/technical-depth.md](docs/technical-depth.md) covers the method (property-based testing and delta debugging), how each app maps to NIST SP 800-63A-4 and the OWASP Top 10 for LLM Applications, measured fix prices, and the limits.
 
@@ -98,11 +98,11 @@ If any of the four is missing, the workflow publishes nothing and still passes.
 
 The headings follow the write-up questions in the Kiroween rules. Each spec, hook and agent gets one line, added in the same change as the thing itself.
 
-The steering files, the rule-engine requirements and design, and the two hooks were drafted outside Kiro and committed for Kiro to work from. The screens in `apps/`, the front door and the hosting files were also built outside Kiro. The engine (`packages/core`), the two worlds, the CLI and the screen adapters were written by Kiro.
+The steering files, the rule-engine requirements and design, and the two hooks were drafted outside Kiro and committed for Kiro to work from. The screens in `apps/`, the front door and the hosting files were also built outside Kiro. The engine (`packages/core`), the two worlds, the CLI and the screen adapters were written by Kiro: the rule engine from the rule-engine spec's task list, the rest from agent chat. Joining the two was done outside Kiro: one call in `packages/core/src/world/generate.ts` and the dependency versions.
 
 ### Kiro IDE, CLI, Web, Crew
 
-- **Kiro IDE** · agent chat wrote the engine, the worlds, the CLI and the adapters, and ran the tests and builds from the IDE terminal.
+- **Kiro IDE** · spec tasks wrote the rule engine. Agent chat wrote the rest of the engine, the worlds, the CLI and the adapters, and ran the tests and builds from the IDE terminal.
 
 ### Custom agents
 
@@ -113,11 +113,11 @@ None yet. Doctor (invents monster patterns) and Inspector (proposes fixes) are p
 ### Agent hooks
 
 - **Lab report on rules save** · `.kiro/hooks/lab-report-on-rules-save.json` · when Kiro saves a rule pack in `rules/`, runs the CLI and rewrites `reports/latest.md`. *Still off: it waits for the crypt and the CLI's exit code.*
-- **Property tests after each task** · `.kiro/hooks/property-tests-after-task.json` · after every spec task, runs the property tests and tells the agent if one fails. *Has not fired yet: the engine was built from chat, not from spec tasks.*
+- **Property tests after each task** · `.kiro/hooks/property-tests-after-task.json` · after every spec task, runs the property tests and tells the agent if one fails. *Switched on while the rule-engine spec ran its 20 tasks. Code built from chat never triggers it.*
 
 ### Spec-driven development
 
-- **rule-engine** (R3) · `.kiro/specs/rule-engine/` · requirements in EARS and a design with six correctness properties. Kiro wrote `packages/core/src/rules` to that design in chat, with one property test per design property. *`tasks.md` was not generated: the spec was used as the brief, not run through the task list.*
+- **rule-engine** (R3) · `.kiro/specs/rule-engine/` · requirements in EARS and a design with six correctness properties. Kiro wrote the task list and ran all 20 tasks: 14 that built `packages/core/src/rules` and 6 that fixed what a code review found. Its 31 example tests and 14 property tests pass. A second rule engine, written in chat to the same design while the spec ran, was replaced by this one: the worlds, shrink and pricing built on the chat version needed one changed call.
 
 The prompt that starts each spec in Kiro is kept in [docs/kiro-prompts.md](docs/kiro-prompts.md), with the order the specs run in.
 
@@ -135,6 +135,7 @@ None yet. P1: the tools `run_lab` and `explain_monster`, callable from Kiro chat
 ### Property-based testing
 
 - **Rule-engine properties, test design** · fast-check generated signal names from regular expressions, which was slow enough that 15 property tests timed out. Fix: generators draw from fixed name pools. The suite went from over six minutes to about one second, with the same properties.
+- **Inherited names, caught by review, not by a property** · a rule could read `constructor` or `toString` as a signal and still get a verdict, because lookups followed the prototype chain. No property saw it: generated signal names never spell those words. Fix: own-property lookups, and the unknown-signal property now draws those names.
 - **Igor world, caught by acceptance, not by a property** · the first world's tests passed, but the CLI report showed 120 of 120 monsters walking, and shrinking could cut a monster down to nothing because a missing stitch fell back to a clean value. Fix: defined values for missing stitches, harm only while the registry does not match, and careless monsters. A new test checks the demo line in `product.md`: monster #17 shrinks to two stitches, each cut gets it caught, and the blind spot is `registry`.
 
 ### Kiro powers

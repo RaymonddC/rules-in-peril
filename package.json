@@ -16,5 +16,8 @@
     "build:site": "node build-site.mjs",
     "preview:site": "vite preview --outDir dist --port 4173 --strictPort",
     "report": "vite-node packages/cli/src/run.ts rules/starter-fintech.json"
+  },
+  "devDependencies": {
+    "vite-node": "^6.0.0"
   }
 }

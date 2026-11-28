@@ -1,9 +1,10 @@
-// Example tests for the rule engine.
-// Feature: rule-engine
-
 import { describe, expect, it } from "vitest";
-import { evaluate, matches, parseRules, runRules, signalsRead } from "./index";
-import type { RuleSet, SignalSchema } from "./types";
+import { evaluate, parseRules, runRules } from "./index.js";
+import type { SignalSchema } from "./types.js";
+
+// ---------------------------------------------------------------------------
+// Shared fixtures — the data-model rules file from the design doc
+// ---------------------------------------------------------------------------
 
 const schema: SignalSchema = {
   score: { kind: "number" },
@@ -12,7 +13,6 @@ const schema: SignalSchema = {
   zone: { kind: "enum", values: ["local", "remote"] },
 };
 
-// The rules file from the design doc.
 const rulesInput = {
   rules: [
     { id: "low-score", when: { signal: "score", op: "<", value: 40 }, then: "reject" },
@@ -29,208 +29,386 @@ const rulesInput = {
   ],
 };
 
-describe("parseRules", () => {
-  it("accepts the design doc example", () => {
-    const r = parseRules(rulesInput, schema);
-    expect(r.ok).toBe(true);
+// ---------------------------------------------------------------------------
+// Happy path — evaluation
+// ---------------------------------------------------------------------------
+
+describe("happy path evaluation", () => {
+  const parsed = parseRules(rulesInput, schema);
+  if (!parsed.ok) throw new Error("fixture rules failed to parse");
+  const ruleSet = parsed.ruleSet;
+
+  it("triggers low-score for score < 40", () => {
+    const signals = { score: 10, ageDays: 10, flagged: false, zone: "local" };
+    expect(evaluate(ruleSet, signals)).toEqual({ outcome: "reject", ruleId: "low-score" });
   });
 
-  it("accepts an empty rules list", () => {
-    const r = parseRules({ rules: [] }, schema);
-    expect(r.ok).toBe(true);
+  it("triggers new-and-remote for zone=remote AND ageDays < 3", () => {
+    const signals = { score: 50, ageDays: 1, flagged: false, zone: "remote" };
+    expect(evaluate(ruleSet, signals)).toEqual({ outcome: "review", ruleId: "new-and-remote" });
   });
 
-  it("rejects an empty id", () => {
-    const r = parseRules({ rules: [{ id: "", when: { signal: "score", op: "<", value: 10 }, then: "reject" }] }, schema);
-    expect(r.ok).toBe(false);
+  it("approves when neither rule matches", () => {
+    const signals = { score: 50, ageDays: 10, flagged: false, zone: "local" };
+    expect(evaluate(ruleSet, signals)).toEqual({ outcome: "approve", ruleId: null });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Boundary values
+// ---------------------------------------------------------------------------
+
+describe("boundary values", () => {
+  const parsed = parseRules(rulesInput, schema);
+  if (!parsed.ok) throw new Error("fixture rules failed to parse");
+  const ruleSet = parsed.ruleSet;
+
+  it("score = 40 does NOT match the < 40 rule", () => {
+    const signals = { score: 40, ageDays: 10, flagged: false, zone: "local" };
+    expect(evaluate(ruleSet, signals)).toEqual({ outcome: "approve", ruleId: null });
   });
 
-  it("rejects a duplicate id", () => {
-    const r = parseRules(
+  it("ageDays = 3 does NOT match the ageDays < 3 condition", () => {
+    const signals = { score: 50, ageDays: 3, flagged: false, zone: "remote" };
+    // zone=remote AND ageDays < 3: ageDays=3 fails the condition → no match
+    expect(evaluate(ruleSet, signals)).toEqual({ outcome: "approve", ruleId: null });
+  });
+
+  it("ageDays = 3 DOES match a >= 3 condition", () => {
+    const geSchema: SignalSchema = { ageDays: { kind: "number" } };
+    const geRules = {
+      rules: [
+        { id: "senior", when: { signal: "ageDays", op: ">=", value: 3 }, then: "reject" },
+      ],
+    };
+    const geParsed = parseRules(geRules, geSchema);
+    if (!geParsed.ok) throw new Error("ge rules failed to parse");
+    expect(evaluate(geParsed.ruleSet, { ageDays: 3 })).toEqual({
+      outcome: "reject",
+      ruleId: "senior",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Empty rules list
+// ---------------------------------------------------------------------------
+
+describe("empty rules list", () => {
+  it("parses successfully", () => {
+    const result = parseRules({ rules: [] }, schema);
+    expect(result.ok).toBe(true);
+  });
+
+  it("approves every member", () => {
+    const result = parseRules({ rules: [] }, schema);
+    if (!result.ok) throw new Error("empty rules failed to parse");
+    const members = [
+      { id: "alice", signals: { score: 10, ageDays: 1, flagged: true, zone: "remote" } },
+      { id: "bob", signals: { score: 90, ageDays: 30, flagged: false, zone: "local" } },
+    ];
+    const verdicts = runRules(result.ruleSet, members);
+    for (const { verdict } of verdicts) {
+      expect(verdict).toEqual({ outcome: "approve", ruleId: null });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Early approve shielding
+// ---------------------------------------------------------------------------
+
+describe("early approve shielding", () => {
+  it("first approve shields a member from a later reject", () => {
+    const shieldSchema: SignalSchema = { score: { kind: "number" } };
+    const shieldRules = {
+      rules: [
+        // approve everyone with score >= 50 — comes first
+        { id: "safe", when: { signal: "score", op: ">=", value: 50 }, then: "approve" },
+        // reject everyone — would catch score >= 50 too if safe didn't shield them
+        { id: "catch-all", when: { signal: "score", op: ">=", value: 0 }, then: "reject" },
+      ],
+    };
+    const parsed = parseRules(shieldRules, shieldSchema);
+    if (!parsed.ok) throw new Error("shield rules failed to parse");
+
+    // score=70 hits "safe" first → approve
+    expect(evaluate(parsed.ruleSet, { score: 70 })).toEqual({
+      outcome: "approve",
+      ruleId: "safe",
+    });
+    // score=30 misses "safe", hits "catch-all" → reject
+    expect(evaluate(parsed.ruleSet, { score: 30 })).toEqual({
+      outcome: "reject",
+      ruleId: "catch-all",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Load errors
+// ---------------------------------------------------------------------------
+
+describe("load errors", () => {
+  it("rejects empty all: []", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { all: [] }, then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects duplicate ids", () => {
+    const result = parseRules(
       {
         rules: [
           { id: "dup", when: { signal: "score", op: "<", value: 10 }, then: "reject" },
-          { id: "dup", when: { signal: "score", op: ">", value: 90 }, then: "approve" },
+          { id: "dup", when: { signal: "score", op: ">", value: 90 }, then: "reject" },
         ],
       },
       schema,
     );
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.errors.some((e) => e.message.includes("dup"))).toBe(true);
-    }
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("dup"))).toBe(true);
   });
 
-  it("rejects an unknown signal", () => {
-    const r = parseRules({ rules: [{ id: "r1", when: { signal: "UNKNOWN", op: "=", value: 1 }, then: "reject" }] }, schema);
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.errors.some((e) => e.ruleIndex === 0)).toBe(true);
-    }
+  it("rejects empty id", () => {
+    const result = parseRules(
+      { rules: [{ id: "", when: { signal: "score", op: "<", value: 10 }, then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
   });
 
-  it("rejects an unknown key inside a rule", () => {
-    const r = parseRules({ rules: [{ id: "r1", when: { signal: "score", op: "<", value: 10 }, then: "reject", extra: true }] }, schema);
-    expect(r.ok).toBe(false);
-  });
-
-  it("rejects < on a boolean", () => {
-    const r = parseRules({ rules: [{ id: "r1", when: { signal: "flagged", op: "<", value: true }, then: "reject" }] }, schema);
-    expect(r.ok).toBe(false);
-  });
-
-  it("rejects an enum value outside the list", () => {
-    const r = parseRules({ rules: [{ id: "r1", when: { signal: "zone", op: "=", value: "OUTER_SPACE" }, then: "reject" }] }, schema);
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.errors.some((e) => e.message.includes("OUTER_SPACE"))).toBe(true);
-    }
-  });
-
-  it("rejects < on an enum", () => {
-    const r = parseRules({ rules: [{ id: "r1", when: { signal: "zone", op: "<", value: "local" }, then: "reject" }] }, schema);
-    expect(r.ok).toBe(false);
-  });
-
-  it("rejects an empty 'all' list", () => {
-    const r = parseRules({ rules: [{ id: "r1", when: { all: [] }, then: "reject" }] }, schema);
-    expect(r.ok).toBe(false);
-  });
-
-  it("rejects a 'then' outside the three outcomes", () => {
-    const r = parseRules({ rules: [{ id: "r1", when: { signal: "score", op: "<", value: 10 }, then: "YEET" }] }, schema);
-    expect(r.ok).toBe(false);
-  });
-
-  it("reports both errors when two rules have problems", () => {
-    const r = parseRules(
+  it("rejects unknown key in rule object", () => {
+    const result = parseRules(
       {
         rules: [
-          { id: "r1", when: { signal: "MISSING1", op: "=", value: 1 }, then: "reject" },
-          { id: "r2", when: { signal: "MISSING2", op: "=", value: 1 }, then: "review" },
+          {
+            id: "r1",
+            when: { signal: "score", op: "<", value: 10 },
+            then: "reject",
+            extra: 1,
+          },
         ],
       },
       schema,
     );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.errors.length).toBeGreaterThanOrEqual(2);
+    expect(result.ok).toBe(false);
   });
 
-  it("never throws for any input", () => {
-    for (const v of [null, undefined, 42, "string", [], {}, { rules: null }]) {
-      expect(() => parseRules(v, schema)).not.toThrow();
-    }
-  });
-});
-
-describe("evaluate", () => {
-  const { ruleSet } = (() => {
-    const r = parseRules(rulesInput, schema);
-    if (!r.ok) throw new Error("setup failed");
-    return r;
-  })();
-
-  it("fires the first matching rule", () => {
-    const v = evaluate(ruleSet, { score: 10, ageDays: 1, flagged: false, zone: "local" });
-    expect(v.outcome).toBe("reject");
-    expect(v.ruleId).toBe("low-score");
+  it("rejects unknown signal name", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "doesNotExist", op: "=", value: 0 }, then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("doesNotExist"))).toBe(true);
   });
 
-  it("fires the second rule when the first does not match", () => {
-    const v = evaluate(ruleSet, { score: 50, ageDays: 1, flagged: false, zone: "remote" });
-    expect(v.outcome).toBe("review");
-    expect(v.ruleId).toBe("new-and-remote");
+  it("rejects enum value outside the list", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "zone", op: "=", value: "alien" }, then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
   });
 
-  it("approves by default when no rule matches", () => {
-    const v = evaluate(ruleSet, { score: 50, ageDays: 10, flagged: false, zone: "local" });
-    expect(v.outcome).toBe("approve");
-    expect(v.ruleId).toBeNull();
+  it("rejects < operator on a boolean signal", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "flagged", op: "<", value: true }, then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("flagged"))).toBe(true);
   });
 
-  it("boundary: score < 40 does not fire at exactly 40", () => {
-    const v = evaluate(ruleSet, { score: 40, ageDays: 10, flagged: false, zone: "local" });
-    expect(v.outcome).toBe("approve");
+  it("rejects then with invalid value", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "score", op: "<", value: 10 }, then: "maybe" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
   });
 
-  it("boundary: ageDays < 3 fires at 2 but not at 3", () => {
-    const base = { score: 50, ageDays: 3, flagged: false, zone: "remote" } as const;
-    expect(evaluate(ruleSet, { ...base, ageDays: 2 }).outcome).toBe("review");
-    expect(evaluate(ruleSet, { ...base, ageDays: 3 }).outcome).toBe("approve");
-  });
-
-  it("an early approve shields from a later reject", () => {
-    const shieldInput = {
-      rules: [
-        { id: "shield", when: { signal: "score", op: ">=", value: 80 }, then: "approve" },
-        { id: "reject-all", when: { signal: "score", op: ">=", value: 0 }, then: "reject" },
-      ],
-    };
-    const r = parseRules(shieldInput, schema);
-    if (!r.ok) throw new Error("setup");
-    const v = evaluate(r.ruleSet, { score: 90, ageDays: 0, flagged: false, zone: "local" });
-    expect(v.outcome).toBe("approve");
-    expect(v.ruleId).toBe("shield");
+  it("rejects Infinity as a condition value", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "score", op: ">", value: Infinity }, then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
   });
 });
 
-describe("evaluate – missing signal", () => {
-  it("throws when a member is missing a required signal", () => {
-    const r = parseRules(rulesInput, schema);
-    if (!r.ok) throw new Error("setup");
-    // 'score' is missing
-    expect(() => evaluate(r.ruleSet, { ageDays: 10, flagged: false, zone: "local" } as never, "m1")).toThrow(/"score"/);
+// ---------------------------------------------------------------------------
+// Multiple errors reported together
+// ---------------------------------------------------------------------------
+
+describe("multiple errors in one file", () => {
+  it("reports all errors, not just the first", () => {
+    const result = parseRules(
+      {
+        rules: [
+          // error 1: unknown signal
+          { id: "r1", when: { signal: "ghost", op: "=", value: 0 }, then: "reject" },
+          // error 2: duplicate id (same as r1)
+          { id: "r1", when: { signal: "score", op: ">", value: 50 }, then: "approve" },
+        ],
+      },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.length).toBeGreaterThanOrEqual(2);
   });
 });
 
-describe("runRules", () => {
-  const ruleSet: RuleSet = (() => {
-    const r = parseRules(rulesInput, schema);
-    if (!r.ok) throw new Error("setup");
-    return r.ruleSet;
-  })();
+// ---------------------------------------------------------------------------
+// Missing signal at runtime
+// ---------------------------------------------------------------------------
 
-  it("returns one verdict per member, in order", () => {
-    const members = [
-      { id: "a", signals: { score: 10, ageDays: 10, flagged: false, zone: "local" } },
-      { id: "b", signals: { score: 90, ageDays: 10, flagged: false, zone: "local" } },
+describe("missing signal at runtime", () => {
+  it("throws naming the member id and the missing signal", () => {
+    const parsed = parseRules(rulesInput, schema);
+    if (!parsed.ok) throw new Error("fixture rules failed to parse");
+
+    // "alice" is missing the "score" signal that low-score reads
+    const members = [{ id: "alice", signals: { ageDays: 5, flagged: false, zone: "local" } }];
+
+    expect(() => runRules(parsed.ruleSet, members)).toThrowError(/alice/);
+    expect(() => runRules(parsed.ruleSet, members)).toThrowError(/score/);
+  });
+
+  it("returns no verdicts at all when a member is missing a signal", () => {
+    const parsed = parseRules(rulesInput, schema);
+    if (!parsed.ok) throw new Error("fixture rules failed to parse");
+
+    const members: { id: string; signals: Record<string, import("./types.js").SignalValue> }[] = [
+      { id: "good", signals: { score: 50, ageDays: 10, flagged: false, zone: "local" } },
+      { id: "bad", signals: { ageDays: 5, flagged: false, zone: "local" } }, // missing score
     ];
-    const results = runRules(ruleSet, members);
-    expect(results.map((r) => r.memberId)).toEqual(["a", "b"]);
-    expect(results[0]!.verdict.outcome).toBe("reject");
-    expect(results[1]!.verdict.outcome).toBe("approve");
-  });
 
-  it("throws and returns no results when a signal is missing", () => {
-    const members = [{ id: "bad", signals: { ageDays: 1, flagged: false, zone: "remote" } as never }];
-    expect(() => runRules(ruleSet, members)).toThrow();
-  });
-});
-
-describe("signalsRead", () => {
-  it("lists signals read, sorted, without duplicates", () => {
-    const r = parseRules(rulesInput, schema);
-    if (!r.ok) throw new Error("setup");
-    expect(signalsRead(r.ruleSet)).toEqual(["ageDays", "score", "zone"]);
-  });
-
-  it("returns an empty array for an empty rule set", () => {
-    const r = parseRules({ rules: [] }, schema);
-    if (!r.ok) throw new Error("setup");
-    expect(signalsRead(r.ruleSet)).toEqual([]);
+    let threw = false;
+    let results: ReturnType<typeof runRules> = [];
+    try {
+      results = runRules(parsed.ruleSet, members);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+    expect(results).toHaveLength(0);
   });
 });
 
-describe("matches", () => {
-  it("single condition: = matches exact", () => {
-    expect(matches({ signal: "zone", op: "=", value: "remote" }, { zone: "remote" })).toBe(true);
-    expect(matches({ signal: "zone", op: "=", value: "remote" }, { zone: "local" })).toBe(false);
+// ---------------------------------------------------------------------------
+// Rejects inherited property names as signals
+// ---------------------------------------------------------------------------
+
+describe("rejects inherited property names as signals", () => {
+  const emptySchema: SignalSchema = {};
+
+  for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty"] as const) {
+    it(`rejects "${name}" as a signal name`, () => {
+      const result = parseRules(
+        { rules: [{ id: `r-${name}`, when: { signal: name, op: "=", value: 0 }, then: "reject" }] },
+        emptySchema,
+      );
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.errors.some((e) => e.message.includes(name))).toBe(true);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Property-getter throws do not propagate (Req 1.1)
+// ---------------------------------------------------------------------------
+
+describe("parseRules never throws", () => {
+  it("returns ok:false when an input property getter throws", () => {
+    const evil = Object.defineProperty({}, "rules", {
+      get() { throw new Error("boom"); },
+      enumerable: true,
+    });
+    let result: ReturnType<typeof parseRules> | undefined;
+    expect(() => { result = parseRules(evil, {}); }).not.toThrow();
+    expect(result?.ok).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plain-words error messages (Req 1.7)
+// ---------------------------------------------------------------------------
+
+describe("plain-words error messages", () => {
+  it("missing 'then' — error names 'then'", () => {
+    // Rule has no 'then' field at all
+    const result = parseRules(
+      { rules: [{ id: "r1", when: { signal: "score", op: "<", value: 10 } }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("then"))).toBe(true);
   });
 
-  it("all: matches only when every condition matches", () => {
-    const when = { all: [{ signal: "score", op: "<" as const, value: 40 }, { signal: "flagged", op: "=" as const, value: true }] };
-    expect(matches(when, { score: 30, flagged: true })).toBe(true);
-    expect(matches(when, { score: 30, flagged: false })).toBe(false);
-    expect(matches(when, { score: 50, flagged: true })).toBe(false);
+  it("bad 'op' value — error names 'op'", () => {
+    const result = parseRules(
+      {
+        rules: [
+          { id: "r1", when: { signal: "score", op: "badop", value: 10 }, then: "reject" },
+        ],
+      },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("op"))).toBe(true);
+  });
+
+  it("missing 'value' in condition — error names 'value'", () => {
+    const result = parseRules(
+      {
+        rules: [
+          { id: "r1", when: { signal: "score", op: "<" }, then: "reject" },
+        ],
+      },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("value"))).toBe(true);
+  });
+
+  it("'when' is a plain string — error names 'when'", () => {
+    const result = parseRules(
+      { rules: [{ id: "r1", when: "bad", then: "reject" }] },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("when"))).toBe(true);
+  });
+
+  it("unknown key in rule — error names the unknown key", () => {
+    const result = parseRules(
+      {
+        rules: [
+          {
+            id: "r1",
+            when: { signal: "score", op: "<", value: 10 },
+            then: "reject",
+            extra: true,
+          },
+        ],
+      },
+      schema,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.message.includes("extra"))).toBe(true);
   });
 });
