@@ -2,7 +2,7 @@
 // Feature: igor-world (R2, R3)
 
 import { describe, expect, it } from "vitest";
-import { parseRules, runWorld } from "@rip/core";
+import { evaluate, parseRules, runWorld, shrink } from "@rip/core";
 import { makeIgorWorld } from "./index";
 import { IGOR_SCHEMA } from "./schema";
 
@@ -100,11 +100,18 @@ describe("makeIgorWorld", () => {
     expect(hasBorrowed).toBe(true);
   });
 
-  it("harmDone always returns true for Igor", () => {
-    const world = makeIgorWorld(SEED, 0, 10);
+  it("every generated monster does harm: the registry never matches", () => {
+    const world = makeIgorWorld(SEED, 0, MONSTER_COUNT);
     for (const member of world.members) {
       expect(world.harmDone(member.records)).toBe(true);
     }
+  });
+
+  it("an applicant who is the real owner of the ID number does no harm", () => {
+    const world = makeIgorWorld(SEED, 0, 1);
+    const records = world.records([{ part: "idNumber", kind: "borrowed", docScore: 80, ownerAge: 30 }]);
+    expect(records[0]!["registry"]).toBe("match");
+    expect(world.harmDone(records)).toBe(false);
   });
 });
 
@@ -117,10 +124,45 @@ describe("Igor world with starter pack", () => {
     // There should be at least one walker
     expect(report.totals.walked).toBeGreaterThan(0);
 
-    // Find the borrowed-number monster at m0 and check it walked
+    // The demo monster, m17, is always a careful borrowed-number monster.
     const walkerIds = new Set(report.walkers.map((w) => w.monsterId));
-    // m0 is always borrowed-number pattern
-    expect(walkerIds.has("m0")).toBe(true);
+    expect(walkerIds.has("m17")).toBe(true);
+  });
+
+  it("the starter pack catches most monsters, and some still walk", () => {
+    const world = makeIgorWorld(SEED, VILLAGER_COUNT, MONSTER_COUNT);
+    const report = runWorld(world, getStarterPack(), SEED);
+    expect(report.totals.caught).toBeGreaterThan(MONSTER_COUNT / 2);
+    expect(report.totals.walked).toBeGreaterThan(0);
+  });
+
+  it("every starter rule catches at least one monster", () => {
+    const world = makeIgorWorld(SEED, VILLAGER_COUNT, MONSTER_COUNT);
+    const report = runWorld(world, getStarterPack(), SEED);
+    for (const hit of report.ruleHits) {
+      if (hit.ruleId === "under-18") continue; // monsters state an adult age
+      expect(hit.monstersCaught, hit.ruleId).toBeGreaterThan(0);
+    }
+  });
+
+  it("demo: monster #17 shrinks to a child's ID number and a made-up name, and the blind spot is registry", () => {
+    const world = makeIgorWorld(SEED, VILLAGER_COUNT, MONSTER_COUNT);
+    const ruleSet = getStarterPack();
+    const m17 = world.members.find((m) => m.id === "m17");
+    if (!m17 || m17.kind !== "monster") throw new Error("m17 missing");
+
+    const result = shrink(world, m17, ruleSet);
+    expect(result.stitches.map((s) => s.part).sort()).toEqual(["idNumber", "name"]);
+    expect(world.stitchLabel(result.stitches.find((s) => s.part === "idNumber")!)).toBe("a child's ID number");
+    expect(result.blindSpot).toContain("registry");
+
+    // One more cut gets it caught: each remaining stitch is needed.
+    for (const s of result.stitches) {
+      const rest = result.stitches.filter((x) => x !== s);
+      const records = world.records(rest);
+      const approved = records.every((r) => evaluate(ruleSet, r).outcome === "approve");
+      expect(approved && world.harmDone(records), `dropping ${s.part}`).toBe(false);
+    }
   });
 
   it("villager rejection rate with starter pack is at most 1%", () => {

@@ -80,7 +80,8 @@ function stitchKind(s: IgorStitch): StitchKind {
 function stitchNote(s: IgorStitch): string {
   switch (s.part) {
     case "idNumber":
-      return s.kind === "borrowed" ? "a child's" : "invented";
+      if (s.kind === "invented") return "invented";
+      return (s.ownerAge ?? 30) < 18 ? "a child's" : "borrowed";
     case "name":
       return `age ${s.statedAge}`;
     case "phone":
@@ -180,7 +181,7 @@ function buildAutopsy(
     coreCards,
     blindSpot: {
       signal: blindSignal,
-      value: describeBlindSpotValue(blindSignal, shrunk),
+      value: String(world.records(shrunk)[0]?.[blindSignal] ?? ""),
       body: `No rule reads "${blindSignal}", so this signal never fires.`,
     },
   };
@@ -219,16 +220,6 @@ function describeStitch(s: IgorStitch): string {
     case "speed":
       return `Form completed in ${s.fillSeconds} seconds.`;
   }
-}
-
-function describeBlindSpotValue(signal: string, stitches: readonly IgorStitch[]): string {
-  if (signal === "registry") {
-    const hasIdStitch = stitches.find((s) => s.part === "idNumber");
-    if (hasIdStitch && hasIdStitch.part === "idNumber") {
-      return hasIdStitch.kind === "borrowed" ? "mismatch" : "match";
-    }
-  }
-  return "see signals";
 }
 
 // ---------------------------------------------------------------------------

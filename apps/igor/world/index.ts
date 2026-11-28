@@ -3,76 +3,68 @@
 // All randomness comes from the seed via makePrng/randInt/pick.
 
 import { makePrng, randInt, pick } from "@rip/core";
-import type { Member, Monster, Villager, World } from "@rip/core";
+import type { Member, Monster, Signals, Villager, World } from "@rip/core";
 import { IGOR_SCHEMA } from "./schema";
 import { stitchesToSignals, signalsChangedByStitch, type IgorStitch } from "./stitches";
 
-// ---------------------------------------------------------------------------
-// Villager generation
-// ---------------------------------------------------------------------------
+type Rng = () => number;
 
-function makeVillager(id: string, rng: () => number): Villager {
-  // registry: 92% match, 7% partial, 1% mismatch
+/** Integer in [lo, hi], inclusive. */
+const between = (rng: Rng, lo: number, hi: number) => lo + randInt(rng, hi - lo + 1);
+
+// ---------------------------------------------------------------------------
+// Villagers
+// ---------------------------------------------------------------------------
+//
+// Honest applicants are not perfect. A few have a blurred document photo,
+// type fast, sign up from an office network or a new phone, or have no
+// credit file yet. Those are what a fix costs.
+
+function makeVillager(id: string, rng: Rng): Villager {
   const registryRoll = rng();
-  const registry =
-    registryRoll < 0.92 ? "match" : registryRoll < 0.99 ? "partial" : "mismatch";
+  // A typo or a changed name shows as "partial". Enough of them that
+  // rejecting on registry breaks the 1% promise, while review does not.
+  const registry = registryRoll < 0.92 ? "match" : registryRoll < 0.99 ? "partial" : "mismatch";
 
-  // docScore: 55–95
-  const docScore = 55 + randInt(rng, 41);
+  const docScore = rng() < 0.003 ? between(rng, 25, 39) : between(rng, 55, 95);
+  const age = between(rng, 18, 70);
+  // Young applicants often have no credit file yet.
+  const fileAgeMonths = rng() < 0.06 ? 0 : between(rng, 1, 120);
 
-  // age: 18–70
-  const age = 18 + randInt(rng, 53);
+  const freshContact = rng() < 0.02;
+  const phoneAgeDays = freshContact ? between(rng, 0, 2) : between(rng, 30, 1800);
+  const emailAgeDays = freshContact ? between(rng, 0, 2) : between(rng, 30, 1800);
 
-  // fileAgeMonths: 1–120
-  const fileAgeMonths = 1 + randInt(rng, 120);
+  const addressIds30d = between(rng, 1, 2);
+  const addressRoll = rng();
+  // A mail drop is only used by villagers who already have a file.
+  const addressType =
+    addressRoll < 0.01 && fileAgeMonths > 0 ? "maildrop" : addressRoll < 0.06 ? "commercial" : "residential";
 
-  // authorizedUserOnly: false for all villagers
-  const authorizedUserOnly = false;
-
-  // phoneAgeDays: 30–1800
-  const phoneAgeDays = 30 + randInt(rng, 1771);
-
-  // emailAgeDays: 30–1800
-  const emailAgeDays = 30 + randInt(rng, 1771);
-
-  // deviceIds24h: 1
-  const deviceIds24h = 1;
-
-  // addressIds30d: 1–2
-  const addressIds30d = 1 + randInt(rng, 2);
-
-  // addressType: 95% residential, 5% commercial
-  const addressType = rng() < 0.95 ? "residential" : "commercial";
-
-  // ipType: 70% home, 25% mobile, 5% vpn
   const ipRoll = rng();
-  const ipType = ipRoll < 0.70 ? "home" : ipRoll < 0.95 ? "mobile" : "vpn";
+  const ipType = ipRoll < 0.03 ? "datacenter" : ipRoll < 0.08 ? "vpn" : ipRoll < 0.33 ? "mobile" : "home";
 
-  // fillSeconds: 25–180
-  const fillSeconds = 25 + randInt(rng, 156);
+  const fillSeconds = rng() < 0.002 ? between(rng, 12, 19) : between(rng, 25, 180);
 
-  return {
-    id,
-    kind: "villager",
-    records: [{
-      registry,
-      docScore,
-      age,
-      fileAgeMonths,
-      authorizedUserOnly,
-      phoneAgeDays,
-      emailAgeDays,
-      deviceIds24h,
-      addressIds30d,
-      addressType,
-      ipType,
-      fillSeconds,
-    }],
+  const record: Signals = {
+    registry,
+    docScore,
+    age,
+    fileAgeMonths,
+    authorizedUserOnly: false,
+    phoneAgeDays,
+    emailAgeDays,
+    deviceIds24h: 1,
+    addressIds30d,
+    addressType,
+    ipType,
+    fillSeconds,
   };
+  return { id, kind: "villager", records: [record] };
 }
 
 // ---------------------------------------------------------------------------
-// Monster patterns
+// Monsters
 // ---------------------------------------------------------------------------
 
 type MonsterPattern =
@@ -83,216 +75,6 @@ type MonsterPattern =
   | "manipulated-twin"
   | "aged-then-bust-out";
 
-/**
- * Borrowed number monster.
- *
- * Uses a child's ID number (registry=mismatch) but the application form says
- * the applicant is 34. No starter-pack rule reads `registry`, so it walks.
- * docScore is good (55–90) so the low-doc-score rule doesn't fire.
- * statedAge is 25–45 so the under-18 rule doesn't fire.
- */
-function makeBorrowedNumber(id: string, rng: () => number): Monster<IgorStitch> {
-  const docScore = 55 + randInt(rng, 36); // 55–90
-  const statedAge = 25 + randInt(rng, 21); // 25–45
-  const phoneAgeDays = 30 + randInt(rng, 300);
-  const emailAgeDays = 30 + randInt(rng, 300);
-  const fillSeconds = 30 + randInt(rng, 100);
-
-  const stitches: IgorStitch[] = [
-    { part: "idNumber", kind: "borrowed", docScore },
-    { part: "name", statedAge },
-    { part: "phone", ageDays: phoneAgeDays },
-    { part: "email", ageDays: emailAgeDays },
-    { part: "device", idsInWindow: 1 },
-    { part: "address", addressType: "residential", idsInWindow: 1 },
-    { part: "network", ipType: "home" },
-    { part: "file", ageMonths: 24, authorizedUserOnly: false },
-    { part: "speed", fillSeconds },
-  ];
-
-  const records = [stitchesToSignals(stitches)];
-  return { id, kind: "monster", stitches, records };
-}
-
-/**
- * Piggyback monster.
- *
- * Thin identity: file exists only because someone added this person as an
- * authorized user. The file stitch sets authorizedUserOnly=true.
- * No starter-pack rule checks authorizedUserOnly, so it can walk.
- */
-function makePiggyback(id: string, rng: () => number): Monster<IgorStitch> {
-  const docScore = 55 + randInt(rng, 36); // 55–90
-  const statedAge = 25 + randInt(rng, 21);
-  const phoneAgeDays = 30 + randInt(rng, 300);
-  const emailAgeDays = 30 + randInt(rng, 300);
-  const fillSeconds = 30 + randInt(rng, 100);
-  const fileAgeMonths = 1 + randInt(rng, 48);
-
-  const stitches: IgorStitch[] = [
-    { part: "idNumber", kind: "invented", docScore },
-    { part: "name", statedAge },
-    { part: "phone", ageDays: phoneAgeDays },
-    { part: "email", ageDays: emailAgeDays },
-    { part: "device", idsInWindow: 1 },
-    { part: "address", addressType: "residential", idsInWindow: 1 },
-    { part: "network", ipType: "home" },
-    { part: "file", ageMonths: fileAgeMonths, authorizedUserOnly: true },
-    { part: "speed", fillSeconds },
-  ];
-
-  const records = [stitchesToSignals(stitches)];
-  return { id, kind: "monster", stitches, records };
-}
-
-/**
- * Fully fabricated monster.
- *
- * All parts invented, tuned to pass the starter pack.
- * Good docScore, age 25–45, low device/address counts, home IP,
- * phone/email age > 3 days, fill time > 20s.
- */
-function makeFullyFabricated(id: string, rng: () => number): Monster<IgorStitch> {
-  const docScore = 55 + randInt(rng, 36);
-  const statedAge = 25 + randInt(rng, 21);
-  const phoneAgeDays = 10 + randInt(rng, 300);
-  const emailAgeDays = 10 + randInt(rng, 300);
-  const fillSeconds = 30 + randInt(rng, 100);
-
-  const stitches: IgorStitch[] = [
-    { part: "idNumber", kind: "invented", docScore },
-    { part: "name", statedAge },
-    { part: "phone", ageDays: phoneAgeDays },
-    { part: "email", ageDays: emailAgeDays },
-    { part: "device", idsInWindow: 1 },
-    { part: "address", addressType: "residential", idsInWindow: 1 },
-    { part: "network", ipType: "home" },
-    { part: "file", ageMonths: 1, authorizedUserOnly: false },
-    { part: "speed", fillSeconds },
-  ];
-
-  const records = [stitchesToSignals(stitches)];
-  return { id, kind: "monster", stitches, records };
-}
-
-/**
- * Ring monster.
- *
- * Several identities share a device (high deviceIds24h) or an address.
- * The busy-device rule (deviceIds24h >= 3) or addressIds30d catches many,
- * but some slip through (deviceIds24h = 2).
- */
-function makeRing(id: string, rng: () => number): Monster<IgorStitch> {
-  const docScore = 55 + randInt(rng, 36);
-  const statedAge = 25 + randInt(rng, 21);
-  const phoneAgeDays = 10 + randInt(rng, 200);
-  const emailAgeDays = 10 + randInt(rng, 200);
-  const fillSeconds = 30 + randInt(rng, 100);
-  // Use 2 so it stays below the busy-device threshold of 3
-  const deviceIds = 2;
-  const addressIds = 2;
-
-  const stitches: IgorStitch[] = [
-    { part: "idNumber", kind: "invented", docScore },
-    { part: "name", statedAge },
-    { part: "phone", ageDays: phoneAgeDays },
-    { part: "email", ageDays: emailAgeDays },
-    { part: "device", idsInWindow: deviceIds },
-    { part: "address", addressType: "residential", idsInWindow: addressIds },
-    { part: "network", ipType: "home" },
-    { part: "file", ageMonths: 1, authorizedUserOnly: false },
-    { part: "speed", fillSeconds },
-  ];
-
-  const records = [stitchesToSignals(stitches)];
-  return { id, kind: "monster", stitches, records };
-}
-
-/**
- * Manipulated twin monster.
- *
- * A real identity with a few details changed: good registry (match for the
- * original parts), but new phone/email to dodge the age checks.
- */
-function makeManipulatedTwin(id: string, rng: () => number): Monster<IgorStitch> {
-  const docScore = 55 + randInt(rng, 36);
-  const statedAge = 25 + randInt(rng, 21);
-  // new phone and email (but each individually >= 3 days)
-  const phoneAgeDays = 5 + randInt(rng, 100);
-  const emailAgeDays = 5 + randInt(rng, 100);
-  const fillSeconds = 30 + randInt(rng, 100);
-
-  const stitches: IgorStitch[] = [
-    { part: "idNumber", kind: "invented", docScore },
-    { part: "name", statedAge },
-    { part: "phone", ageDays: phoneAgeDays },
-    { part: "email", ageDays: emailAgeDays },
-    { part: "device", idsInWindow: 1 },
-    { part: "address", addressType: "residential", idsInWindow: 1 },
-    { part: "network", ipType: "home" },
-    { part: "file", ageMonths: 12, authorizedUserOnly: false },
-    { part: "speed", fillSeconds },
-  ];
-
-  const records = [stitchesToSignals(stitches)];
-  return { id, kind: "monster", stitches, records };
-}
-
-/**
- * Aged-then-bust-out monster.
- *
- * Everything looks seasoned: old file, old phone, old email.
- * No starter-pack rule catches it.
- */
-function makeAgedThenBustOut(id: string, rng: () => number): Monster<IgorStitch> {
-  const docScore = 55 + randInt(rng, 36);
-  const statedAge = 30 + randInt(rng, 20);
-  const phoneAgeDays = 400 + randInt(rng, 500);
-  const emailAgeDays = 400 + randInt(rng, 500);
-  const fillSeconds = 30 + randInt(rng, 100);
-  const fileAgeMonths = 12 + randInt(rng, 24);
-
-  const stitches: IgorStitch[] = [
-    { part: "idNumber", kind: "invented", docScore },
-    { part: "name", statedAge },
-    { part: "phone", ageDays: phoneAgeDays },
-    { part: "email", ageDays: emailAgeDays },
-    { part: "device", idsInWindow: 1 },
-    { part: "address", addressType: "residential", idsInWindow: 1 },
-    { part: "network", ipType: "home" },
-    { part: "file", ageMonths: fileAgeMonths, authorizedUserOnly: false },
-    { part: "speed", fillSeconds },
-  ];
-
-  const records = [stitchesToSignals(stitches)];
-  return { id, kind: "monster", stitches, records };
-}
-
-function makeMonster(
-  id: string,
-  rng: () => number,
-  pattern: MonsterPattern,
-): Monster<IgorStitch> {
-  switch (pattern) {
-    case "borrowed-number":
-      return makeBorrowedNumber(id, rng);
-    case "piggyback":
-      return makePiggyback(id, rng);
-    case "fully-fabricated":
-      return makeFullyFabricated(id, rng);
-    case "ring":
-      return makeRing(id, rng);
-    case "manipulated-twin":
-      return makeManipulatedTwin(id, rng);
-    case "aged-then-bust-out":
-      return makeAgedThenBustOut(id, rng);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// World factory
-// ---------------------------------------------------------------------------
-
 const PATTERNS: MonsterPattern[] = [
   "borrowed-number",
   "piggyback",
@@ -302,11 +84,127 @@ const PATTERNS: MonsterPattern[] = [
   "aged-then-bust-out",
 ];
 
-export function makeIgorWorld(
-  seed: number,
-  villagerCount: number,
-  monsterCount: number,
-): World<IgorStitch> {
+interface Tail {
+  /** Scales the chance of each careless part. 0 makes a careful monster. */
+  sloppiness: number;
+  fileAgeMonths: number;
+  authorizedUserOnly: boolean;
+  /** Chance that the device is shared by 3 or more identities. */
+  busyDevice: number;
+  oldContact: boolean;
+}
+
+/**
+ * The parts after the ID number and name. Attackers are often careless:
+ * a scripted form fill, a data-center network, a mail drop with no file,
+ * a phone and email bought the same day, a shared device. Each one is a
+ * chance for the rules to catch the monster.
+ */
+function tail(rng: Rng, t: Tail): IgorStitch[] {
+  const s = t.sloppiness;
+
+  const freshContact = rng() < 0.2 * s;
+  const phoneAgeDays = freshContact ? between(rng, 0, 2) : t.oldContact ? between(rng, 400, 900) : between(rng, 10, 400);
+  const emailAgeDays = freshContact ? between(rng, 0, 2) : t.oldContact ? between(rng, 400, 900) : between(rng, 10, 400);
+
+  const deviceIds = rng() < t.busyDevice ? between(rng, 3, 6) : between(rng, 1, 2);
+
+  const maildrop = rng() < 0.15 * s;
+  const addressType = maildrop ? "maildrop" : "residential";
+  const addressIds = maildrop ? between(rng, 2, 9) : 1;
+
+  const ipRoll = rng();
+  const ipType = ipRoll < 0.18 * s ? "datacenter" : ipRoll < 0.25 * s ? "vpn" : ipRoll < 0.5 ? "mobile" : "home";
+
+  const fillSeconds = rng() < 0.25 * s ? between(rng, 4, 19) : between(rng, 30, 130);
+
+  return [
+    { part: "phone", ageDays: phoneAgeDays },
+    { part: "email", ageDays: emailAgeDays },
+    { part: "device", idsInWindow: deviceIds },
+    { part: "address", addressType, idsInWindow: addressIds },
+    { part: "network", ipType },
+    { part: "file", ageMonths: t.fileAgeMonths, authorizedUserOnly: t.authorizedUserOnly },
+    { part: "speed", fillSeconds },
+  ];
+}
+
+/** The document check: a forged or poor document sometimes scores low. */
+function docScore(rng: Rng, sloppiness: number): number {
+  return rng() < 0.15 * sloppiness ? between(rng, 10, 39) : between(rng, 55, 90);
+}
+
+function makeMonster(id: string, rng: Rng, pattern: MonsterPattern, careful = false): Monster<IgorStitch> {
+  const sloppiness = careful ? 0 : pattern === "aged-then-bust-out" ? 0.5 : 1;
+  const base = { sloppiness, busyDevice: careful ? 0 : 0.1, oldContact: false };
+  let head: IgorStitch[];
+  let rest: IgorStitch[];
+
+  switch (pattern) {
+    case "borrowed-number":
+      // A child's ID number under a made-up adult name.
+      head = [
+        { part: "idNumber", kind: "borrowed", docScore: docScore(rng, sloppiness), ownerAge: between(rng, 5, 15) },
+        { part: "name", statedAge: between(rng, 25, 45) },
+      ];
+      rest = tail(rng, { ...base, fileAgeMonths: 0, authorizedUserOnly: false });
+      break;
+    case "manipulated-twin": {
+      // A real adult's ID number with the name changed a little.
+      const ownerAge = between(rng, 25, 60);
+      head = [
+        { part: "idNumber", kind: "borrowed", docScore: docScore(rng, sloppiness), ownerAge },
+        { part: "name", statedAge: ownerAge, close: true },
+      ];
+      rest = tail(rng, { ...base, fileAgeMonths: between(rng, 6, 60), authorizedUserOnly: false });
+      break;
+    }
+    case "piggyback":
+      head = [
+        { part: "idNumber", kind: "invented", docScore: docScore(rng, sloppiness) },
+        { part: "name", statedAge: between(rng, 25, 45) },
+      ];
+      rest = tail(rng, { ...base, fileAgeMonths: between(rng, 1, 24), authorizedUserOnly: true });
+      break;
+    case "ring":
+      head = [
+        { part: "idNumber", kind: "invented", docScore: docScore(rng, sloppiness) },
+        { part: "name", statedAge: between(rng, 22, 45) },
+      ];
+      rest = tail(rng, { ...base, busyDevice: 0.75, fileAgeMonths: 0, authorizedUserOnly: false });
+      break;
+    case "aged-then-bust-out":
+      head = [
+        { part: "idNumber", kind: "invented", docScore: docScore(rng, sloppiness) },
+        { part: "name", statedAge: between(rng, 30, 50) },
+      ];
+      rest = tail(rng, { ...base, oldContact: true, fileAgeMonths: between(rng, 12, 36), authorizedUserOnly: false });
+      break;
+    default:
+      // fully-fabricated: every part invented.
+      head = [
+        { part: "idNumber", kind: "invented", docScore: docScore(rng, sloppiness) },
+        { part: "name", statedAge: between(rng, 21, 45) },
+      ];
+      rest = tail(rng, { ...base, fileAgeMonths: 0, authorizedUserOnly: false });
+      break;
+  }
+
+  const stitches = [...head, ...rest];
+  return { id, kind: "monster", stitches, records: [stitchesToSignals(stitches)] };
+}
+
+// ---------------------------------------------------------------------------
+// World factory
+// ---------------------------------------------------------------------------
+
+/**
+ * The monster the demo follows. The Autopsy and Close the gap screens open
+ * monster #17, so it is always a careful borrowed-number monster.
+ */
+export const DEMO_MONSTER_INDEX = 17;
+
+export function makeIgorWorld(seed: number, villagerCount: number, monsterCount: number): World<IgorStitch> {
   const rng = makePrng(seed);
   const members: Member<IgorStitch>[] = [];
 
@@ -314,16 +212,13 @@ export function makeIgorWorld(
     members.push(makeVillager(`v${i}`, rng));
   }
 
-  // Ensure at least one borrowed-number monster for the demo (seed 1818).
-  // We place it at index 0 and use the remaining monster slots for random patterns.
+  const demoIndex = monsterCount > DEMO_MONSTER_INDEX ? DEMO_MONSTER_INDEX : 0;
   for (let i = 0; i < monsterCount; i++) {
-    let pattern: MonsterPattern;
-    if (i === 0) {
-      pattern = "borrowed-number";
+    if (i === demoIndex) {
+      members.push(makeMonster(`m${i}`, rng, "borrowed-number", true));
     } else {
-      pattern = pick(rng, PATTERNS);
+      members.push(makeMonster(`m${i}`, rng, pick(rng, PATTERNS)));
     }
-    members.push(makeMonster(`m${i}`, rng, pattern));
   }
 
   return {
@@ -334,24 +229,26 @@ export function makeIgorWorld(
       return [stitchesToSignals(stitches)];
     },
 
-    harmDone(_records) {
-      // For Igor: harm is simply that the identity was approved.
-      // The walk check (all records approved) is the full harm check.
-      return true;
+    harmDone(records) {
+      // An applicant who really is the owner of the ID number does no harm.
+      // Every monster's harm is applying as someone the registry does not
+      // match: a borrowed, altered or invented identity.
+      return records.every((r) => r["registry"] !== "match");
     },
 
     stitchLabel(stitch: IgorStitch): string {
       switch (stitch.part) {
         case "idNumber":
-          return stitch.kind === "borrowed" ? "a child's ID number" : "an invented ID number";
+          if (stitch.kind === "invented") return "an invented ID number";
+          return (stitch.ownerAge ?? 30) < 18 ? "a child's ID number" : "another resident's ID number";
         case "name":
-          return `a made-up name (stated age ${stitch.statedAge})`;
+          return stitch.close ? "a slightly changed name" : "a made-up name";
         case "phone":
           return `a phone number (${stitch.ageDays} days old)`;
         case "email":
           return `an email address (${stitch.ageDays} days old)`;
         case "device":
-          return `a device (${stitch.idsInWindow} identity in window)`;
+          return `a device (${stitch.idsInWindow} identities in 24 hours)`;
         case "address":
           return `a ${stitch.addressType} address`;
         case "network":
